@@ -1,6 +1,7 @@
 /**
- * 运动户外专用版 app.js (布局优化版)
- * 优化点：重组卡片布局，IVCN独占一行，链接并排，ID与日期并排
+ * 运动户外专用版 app.js (最终布局+精确筛选修复版)
+ * 1. 布局：IVCN独占一行，链接并排，ID与日期并排
+ * 2. 筛选：修复类目筛选冲突，改用精确匹配，不再误伤
  */
 
 const state = { allProducts: [], filteredProducts: [] };
@@ -113,6 +114,9 @@ function refillCategory2Options() {
   });
 }
 
+/**
+ * 修改后的 applyFilters：分离精确类目和模糊搜索
+ */
 function applyFilters() {
   const keyword = (els.keyword.value || '').trim().toLowerCase();
   const category1 = els.category1.value;
@@ -123,13 +127,16 @@ function applyFilters() {
   const sortBy = els.sortBy.value;
 
   let list = state.allProducts.filter(item => {
-    const haystack = [
-      item.title, item.inviteId, item.itemid, item.modelId, item.variant, item.l1, item.l2
+    // 1. 关键词：只在标题、ID、邀请码里模糊搜索
+    const searchText = [
+      item.title, item.inviteId, item.modelId, item.itemid, item.variant
     ].join(' ').toLowerCase();
+    const okKeyword = !keyword || searchText.includes(keyword);
 
-    const okKeyword = !keyword || haystack.includes(keyword);
-    const okCat1 = !category1 || item.l1 === category1;
-    const okCat2 = !category2 || item.l2 === category2;
+    // 2. 类目：必须是绝对相等 (精确匹配)
+    const okCat1 = !category1 || String(item.l1) === category1;
+    const okCat2 = !category2 || String(item.l2) === category2;
+
     const okPriority = !priority || (item['提品优先级'] || '').includes(priority);
     const price = parseFloat(item.price || 0);
     const okMin = Number.isNaN(minPrice) || price >= minPrice;
