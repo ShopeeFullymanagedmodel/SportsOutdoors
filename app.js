@@ -1,3 +1,8 @@
+/**
+ * 运动户外专用版 app.js
+ * 适配 CSV 字段：title, variant, price, imgUrl, link, l1, l2, inviteId, modelId, final_1688_link, 提品优先级, update date, itemid
+ */
+
 const state = { allProducts: [], filteredProducts: [] };
 
 const els = {
@@ -17,51 +22,43 @@ const els = {
   toast: document.getElementById('toast')
 };
 
-// 初始化：读取数据
 async function init() {
   try {
-    // 1. 读取根目录下的 data.csv (请确保文件名全小写)
-    const response = await fetch('./data.csv');
-    if (!response.ok) throw new Error('找不到 data.csv 文件，请确认文件在根目录且名为 data.csv');
+    // 强制读取根目录下的 data.csv (请确保 GitHub 仓库里文件名就是 data.csv)
+    const response = await fetch('./data.csv?v=' + Date.now());
+    if (!response.ok) throw new Error('找不到 data.csv 文件，请确认它在根目录');
     
     const csvText = await response.text();
-    
-    // 2. 解析 CSV (处理逗号、换行和空格)
     const products = parseCSV(csvText);
     
-    if (products.length === 0) throw new Error('CSV 文件内容为空或格式错误');
-
-    // 3. 填充数据
-    els.siteTitle.textContent = '运动户外热销原品清单';
     state.allProducts = products;
-    
-    // 4. 运行页面逻辑
     fillCategory1Options();
     bindEvents();
     applyFilters();
     
-    console.log("✅ 数据加载成功:", products.length, "条数据");
+    console.log("✅ 加载成功，共 " + products.length + " 条数据");
   } catch (error) {
     console.error("❌ 加载失败:", error);
-    showToast("加载失败: " + error.message);
+    if(els.cardGrid) els.cardGrid.innerHTML = `<div style="color:red;padding:20px;">加载失败: ${error.message}</div>`;
   }
 }
 
-// CSV 解析辅助函数 (支持处理带引号的单元格)
+// 适配你 CSV 格式的解析函数
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
   if (lines.length < 2) return [];
 
-  // 获取表头并清理
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  // 1. 获取第一行表头
+  const headers = lines[0].split(',').map(h => h.trim());
   
+  // 2. 解析每一行数据
   return lines.slice(1).map(line => {
-    // 简单的逗号分割，如果数据中包含逗号，建议使用 PapaParse 库
-    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
+    // 处理带引号和逗号的复杂情况
+    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
     const obj = {};
     headers.forEach((header, index) => {
       let val = values[index] ? values[index].trim() : '';
-      obj[header] = val.replace(/^"|"$/g, ''); // 去除两侧引号
+      obj[header] = val.replace(/^"|"$/g, ''); 
     });
     return obj;
   });
@@ -69,12 +66,10 @@ function parseCSV(text) {
 
 function bindEvents() {
   [els.keyword, els.minPrice, els.maxPrice].forEach(el => {
-    if(!el) return;
-    ['input','change'].forEach(evt => el.addEventListener(evt, applyFilters));
+    if(el) ['input','change'].forEach(evt => el.addEventListener(evt, applyFilters));
   });
   [els.category1, els.category2, els.priority, els.sortBy].forEach(el => {
-    if(!el) return;
-    el.addEventListener('change', () => {
+    if(el) el.addEventListener('change', () => {
       if (el === els.category1) refillCategory2Options();
       applyFilters();
     });
@@ -90,12 +85,11 @@ function bindEvents() {
     els.sortBy.value = 'default';
     applyFilters();
   });
-  els.exportBtn?.addEventListener('click', exportCurrentCsv);
 }
 
 function fillCategory1Options() {
-  const values = [...new Set(state.allProducts.map(x => x.category1).filter(Boolean))];
-  els.category1.innerHTML = '<option value="">一级类目(全部)</option>';
+  const values = [...new Set(state.allProducts.map(x => x.l1).filter(Boolean))];
+  els.category1.innerHTML = '<option value="">二级类目(全部)</option>';
   values.forEach(v => {
     const op = document.createElement('option');
     op.value = v;
@@ -106,11 +100,11 @@ function fillCategory1Options() {
 }
 
 function refillCategory2Options() {
-  els.category2.innerHTML = '<option value="">二级类目(全部)</option>';
+  els.category2.innerHTML = '<option value="">三级类目(全部)</option>';
   const selected = els.category1.value;
   let source = state.allProducts;
-  if (selected) source = source.filter(x => x.category1 === selected);
-  const values = [...new Set(source.map(x => x.category2).filter(Boolean))];
+  if (selected) source = source.filter(x => x.l1 === selected);
+  const values = [...new Set(source.map(x => x.l2).filter(Boolean))];
   values.forEach(v => {
     const op = document.createElement('option');
     op.value = v;
@@ -130,23 +124,23 @@ function applyFilters() {
 
   let list = state.allProducts.filter(item => {
     const haystack = [
-      item.title, item.invitationId, item.itemId, item.modelId, item.specName, item.category1, item.category2
+      item.title, item.inviteId, item.itemid, item.modelId, item.variant, item.l1, item.l2
     ].join(' ').toLowerCase();
 
     const okKeyword = !keyword || haystack.includes(keyword);
-    const okCat1 = !category1 || item.category1 === category1;
-    const okCat2 = !category2 || item.category2 === category2;
-    const okPriority = !priority || (item.priority && item.priority.toUpperCase() === priority.toUpperCase());
-    const price = parseFloat(item.targetPrice || 0);
+    const okCat1 = !category1 || item.l1 === category1;
+    const okCat2 = !category2 || item.l2 === category2;
+    const okPriority = !priority || item['提品优先级'] === priority;
+    const price = parseFloat(item.price || 0);
     const okMin = Number.isNaN(minPrice) || price >= minPrice;
     const okMax = Number.isNaN(maxPrice) || price <= maxPrice;
 
     return okKeyword && okCat1 && okCat2 && okPriority && okMin && okMax;
   });
 
-  if (sortBy === 'priceAsc') list.sort((a,b) => parseFloat(a.targetPrice || 0) - parseFloat(b.targetPrice || 0));
-  else if (sortBy === 'priceDesc') list.sort((a,b) => parseFloat(b.targetPrice || 0) - parseFloat(a.targetPrice || 0));
-  else if (sortBy === 'dateDesc') list.sort((a,b) => String(b.updateDate || '').localeCompare(String(a.updateDate || '')));
+  if (sortBy === 'priceAsc') list.sort((a,b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
+  else if (sortBy === 'priceDesc') list.sort((a,b) => parseFloat(b.price || 0) - parseFloat(a.price || 0));
+  else if (sortBy === 'dateDesc') list.sort((a,b) => String(b['update date'] || '').localeCompare(String(a['update date'] || '')));
 
   state.filteredProducts = list;
   renderCards();
@@ -163,84 +157,52 @@ function renderCards() {
   els.emptyState?.classList.add('hidden');
 
   els.cardGrid.innerHTML = state.filteredProducts.map(item => {
-    const pClass = (item.priority || '').toLowerCase();
-    const imgUrl = item.image || '';
+    // 映射颜色：高优先级->红色/绿色
+    const pVal = item['提品优先级'] || '';
+    const pClass = pVal.includes('高') ? 'p0' : 'p1';
     
-    const imagePart = imgUrl 
-      ? `<img class="card-image" src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.title)}" loading="lazy" referrerpolicy="no-referrer" />`
-      : `<div class="img-fallback">暂无图片</div>`;
-
-    const badge = item.pricingLink
-      ? `<a class="priority-link" href="${escapeHtml(item.pricingLink)}" target="_blank"><span class="priority-badge ${pClass}">${escapeHtml(item.priority || '-')}</span></a>`
-      : `<span class="priority-badge ${pClass}">${escapeHtml(item.priority || '-')}</span>`;
-
     return `
       <article class="card">
         <div class="card-top">
-          ${badge}
-          <div class="card-image-wrap">${imagePart}</div>
+          <span class="priority-badge ${pClass}">${escapeHtml(pVal)}</span>
+          <div class="card-image-wrap">
+            <img class="card-image" src="${escapeHtml(item.imgUrl)}" alt="product" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+          </div>
         </div>
         <div class="card-bottom">
           <div class="title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
           <div class="price-row">
-            <div class="price">¥${formatPrice(item.targetPrice)}</div>
-            <div class="spec-name">${escapeHtml(item.specName || '')}</div>
+            <div class="price">¥${formatPrice(item.price)}</div>
+            <div class="spec-name">${escapeHtml(item.variant || '')}</div>
           </div>
           <div class="id-row">
-            <div class="count-badge">共${escapeHtml(item.specCount || '1')}款</div>
-            <div class="invitation-box" data-copy="${escapeHtml(item.invitationId || '')}">${escapeHtml(item.invitationId || '')}</div>
+            <div class="count-badge">ID: ${escapeHtml(item.modelId || '')}</div>
+            <div class="invitation-box" data-copy="${escapeHtml(item.inviteId || '')}">${escapeHtml(item.inviteId || '')}</div>
           </div>
           <div class="meta-row">
-            <div class="meta"><strong>${escapeHtml(item.updateDate)}</strong>发布</div>
-            <div class="meta">${escapeHtml(item.modelId || '')}</div>
-            ${item.originLink ? `<a class="link-btn link-origin" href="${escapeHtml(item.originLink)}" target="_blank">原品 &gt;&gt;&gt;</a>` : ''}
-            ${item.link1688 ? `<a class="link-btn link-1688" href="${escapeHtml(item.link1688)}" target="_blank">1688链接 &gt;&gt;&gt;</a>` : ''}
+            <div class="meta"><strong>${escapeHtml(item['update date'])}</strong></div>
+            ${item.link ? `<a class="link-btn link-origin" href="${escapeHtml(item.link)}" target="_blank">原品 >>></a>` : ''}
+            ${item.final_1688_link ? `<a class="link-btn link-1688" href="${escapeHtml(item.final_1688_link)}" target="_blank">1688链接 >>></a>` : ''}
           </div>
         </div>
       </article>
     `;
   }).join('');
 
-  // 绑定点击复制
   document.querySelectorAll('.invitation-box').forEach(el => {
     el.onclick = async () => {
       const val = el.getAttribute('data-copy');
-      if (!val) return;
-      try {
+      if (val) {
         await navigator.clipboard.writeText(val);
-        showToast(`已复制：${val}`);
-      } catch (err) {
-        showToast('复制失败');
+        showToast(`已复制邀请码：${val}`);
       }
     };
   });
 }
 
-function exportCurrentCsv() {
-  if (!state.filteredProducts.length) return;
-  const rows = state.filteredProducts;
-  const headers = Object.keys(rows[0]);
-  const csvContent = [
-    headers.join(','),
-    ...rows.map(r => headers.map(h => csvEscape(r[h])).join(','))
-  ].join('\n');
-
-  const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'export.csv';
-  a.click();
-}
-
 function formatPrice(v) {
   const p = parseFloat(v || 0);
   return isNaN(p) ? "0.00" : p.toFixed(2);
-}
-
-function csvEscape(v) {
-  const s = String(v ?? '');
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 function escapeHtml(str) {
@@ -258,5 +220,4 @@ function showToast(msg) {
   timer = setTimeout(() => els.toast.classList.add('hidden'), 1800);
 }
 
-// 启动程序
 init();
