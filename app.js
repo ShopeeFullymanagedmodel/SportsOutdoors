@@ -1,6 +1,6 @@
 /**
- * 运动户外专用版 app.js (优化版)
- * 适配 CSV 字段：title, variant, price, imgUrl, link, l1, l2, inviteId, modelId, final_1688_link, 提品优先级, update date, itemid
+ * 运动户外专用版 app.js (最终修正版)
+ * 解决：1. 数量虚高/数据错位 2. 占位图失效 3. CSV换行符干扰
  */
 
 const state = { allProducts: [], filteredProducts: [] };
@@ -24,57 +24,47 @@ const els = {
 
 async function init() {
   try {
-    // 强制读取根目录下的 data.csv，添加时间戳防止浏览器缓存旧数据
     const response = await fetch('./data.csv?v=' + Date.now());
-    if (!response.ok) throw new Error('找不到 data.csv 文件，请确认它在根目录且名为 data.csv');
+    if (!response.ok) throw new Error('找不到 data.csv 文件，请确认它在根目录');
     
     const csvText = await response.text();
     const products = parseCSV(csvText);
     
-    if (products.length === 0) throw new Error('CSV 文件内容为空或解析失败');
+    if (products.length === 0) throw new Error('CSV 解析后无有效数据');
 
     state.allProducts = products;
     fillCategory1Options();
     bindEvents();
     applyFilters();
     
-    console.log("✅ 数据加载成功，共 " + products.length + " 条");
+    console.log("✅ 加载成功，有效条数：" + products.length);
   } catch (error) {
     console.error("❌ 加载失败:", error);
     if(els.cardGrid) {
-      els.cardGrid.innerHTML = `<div style="color:red;padding:20px;text-align:center;">加载失败: ${error.message}<br>请检查 data.csv 是否在根目录。</div>`;
+      els.cardGrid.innerHTML = `<div style="color:red;padding:20px;text-align:center;">数据加载失败: ${error.message}</div>`;
     }
   }
 }
 
-/**
- * 核心解析函数：优先使用 PapaParse 处理复杂 CSV，回退使用正则处理
- */
 function parseCSV(text) {
-  // 如果 index.html 里已经成功引入了 PapaParse 库
   if (window.Papa) {
     const result = Papa.parse(text, {
       header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false
+      skipEmptyLines: 'greedy', // 强力跳过空行
+      quoteChar: '"',
+      escapeChar: '"'
     });
-    return result.data;
+    
+    /**
+     * 【关键修正】过滤逻辑：
+     * 只有同时包含 标题(title) 和 价格(price) 的行才被视为有效产品。
+     * 这能剔除掉 CSV 内部换行导致的 97 条错位碎片数据。
+     */
+    return result.data.filter(item => {
+      return item.title && item.title.trim().length > 1 && item.price;
+    });
   }
-
-  // 备用方案：简单正则解析 (防止 PapaParse 加载失败时页面挂掉)
-  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim());
-  return lines.slice(1).map(line => {
-    // 处理带引号的列
-    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-    const obj = {};
-    headers.forEach((header, index) => {
-      let val = values[index] ? values[index].trim() : '';
-      obj[header] = val.replace(/^"|"$/g, ''); 
-    });
-    return obj;
-  });
+  return [];
 }
 
 function bindEvents() {
@@ -154,7 +144,6 @@ function applyFilters() {
     return okKeyword && okCat1 && okCat2 && okPriority && okMin && okMax;
   });
 
-  // 排序逻辑
   if (sortBy === 'priceAsc') list.sort((a,b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
   else if (sortBy === 'priceDesc') list.sort((a,b) => parseFloat(b.price || 0) - parseFloat(a.price || 0));
   else if (sortBy === 'dateDesc') list.sort((a,b) => String(b['update date'] || '').localeCompare(String(a['update date'] || '')));
@@ -177,6 +166,9 @@ function renderCards() {
     const pVal = item['提品优先级'] || '-';
     const pClass = pVal.includes('高') ? 'p0' : 'p1';
     
+    // 修正：更稳定的备用图片地址
+    const placeholder = "https://images.placeholders.dev/?width=200&height=200&text=无图片&fontSize=24";
+    
     return `
       <article class="card">
         <div class="card-top">
@@ -187,7 +179,7 @@ function renderCards() {
                  alt="product" 
                  loading="lazy" 
                  referrerpolicy="no-referrer" 
-                 onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+                 onerror="this.src='${placeholder}'; this.onerror=null;">
           </div>
         </div>
         <div class="card-bottom">
@@ -210,7 +202,6 @@ function renderCards() {
     `;
   }).join('');
 
-  // 绑定点击复制邀请码
   document.querySelectorAll('.invitation-box').forEach(el => {
     el.onclick = async () => {
       const val = el.getAttribute('data-copy');
@@ -219,7 +210,7 @@ function renderCards() {
           await navigator.clipboard.writeText(val);
           showToast(`已复制邀请码：${val}`);
         } catch(e) {
-          showToast('复制失败，请手动选择复制');
+          showToast('复制失败');
         }
       }
     };
@@ -246,5 +237,4 @@ function showToast(msg) {
   timer = setTimeout(() => els.toast.classList.add('hidden'), 1800);
 }
 
-// 启动
 init();
