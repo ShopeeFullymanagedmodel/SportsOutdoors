@@ -1,6 +1,6 @@
 /**
- * 运动户外专用版 app.js (最终修正版)
- * 解决：1. 数量虚高/数据错位 2. 占位图失效 3. CSV换行符干扰
+ * 运动户外专用版 app.js (布局优化版)
+ * 优化点：重组卡片布局，IVCN独占一行，链接并排，ID与日期并排
  */
 
 const state = { allProducts: [], filteredProducts: [] };
@@ -25,7 +25,7 @@ const els = {
 async function init() {
   try {
     const response = await fetch('./data.csv?v=' + Date.now());
-    if (!response.ok) throw new Error('找不到 data.csv 文件，请确认它在根目录');
+    if (!response.ok) throw new Error('找不到 data.csv 文件');
     
     const csvText = await response.text();
     const products = parseCSV(csvText);
@@ -50,16 +50,10 @@ function parseCSV(text) {
   if (window.Papa) {
     const result = Papa.parse(text, {
       header: true,
-      skipEmptyLines: 'greedy', // 强力跳过空行
+      skipEmptyLines: 'greedy',
       quoteChar: '"',
       escapeChar: '"'
     });
-    
-    /**
-     * 【关键修正】过滤逻辑：
-     * 只有同时包含 标题(title) 和 价格(price) 的行才被视为有效产品。
-     * 这能剔除掉 CSV 内部换行导致的 97 条错位碎片数据。
-     */
     return result.data.filter(item => {
       return item.title && item.title.trim().length > 1 && item.price;
     });
@@ -165,8 +159,6 @@ function renderCards() {
   els.cardGrid.innerHTML = state.filteredProducts.map(item => {
     const pVal = item['提品优先级'] || '-';
     const pClass = pVal.includes('高') ? 'p0' : 'p1';
-    
-    // 修正：更稳定的备用图片地址
     const placeholder = "https://images.placeholders.dev/?width=200&height=200&text=无图片&fontSize=24";
     
     return `
@@ -184,24 +176,33 @@ function renderCards() {
         </div>
         <div class="card-bottom">
           <div class="title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+          
           <div class="price-row">
             <div class="price">¥${formatPrice(item.price)}</div>
             <div class="spec-name">${escapeHtml(item.variant || '')}</div>
           </div>
-          <div class="id-row">
-            <div class="count-badge">ID: ${escapeHtml(item.modelId || '')}</div>
-            <div class="invitation-box" data-copy="${escapeHtml(item.inviteId || '')}">${escapeHtml(item.inviteId || '')}</div>
+
+          <div class="invitation-row" style="margin: 8px 0;">
+             <div class="invitation-box big-row" style="width:100%; cursor:pointer; background:#f0f7ff; border:1px dashed #007bff; color:#007bff; font-weight:bold; padding:8px; text-align:center; border-radius:4px; font-size:14px;" data-copy="${escapeHtml(item.inviteId || '')}">
+               ${escapeHtml(item.inviteId || '')}
+             </div>
           </div>
-          <div class="meta-row">
-            <div class="meta"><strong>${escapeHtml(item['update date'] || '')}</strong></div>
-            ${item.link ? `<a class="link-btn link-origin" href="${escapeHtml(item.link)}" target="_blank" rel="noopener">原品 >>></a>` : ''}
-            ${item.final_1688_link ? `<a class="link-btn link-1688" href="${escapeHtml(item.final_1688_link)}" target="_blank" rel="noopener">1688链接 >>></a>` : ''}
+
+          <div class="links-row" style="display:flex; gap:5px; margin-bottom:8px;">
+            ${item.link ? `<a class="link-btn link-origin" style="flex:1; text-align:center; padding:6px 0; font-size:12px; background:#666; color:#fff; text-decoration:none; border-radius:4px;" href="${escapeHtml(item.link)}" target="_blank" rel="noopener">原品链接</a>` : ''}
+            ${item.final_1688_link ? `<a class="link-btn link-1688" style="flex:1; text-align:center; padding:6px 0; font-size:12px; background:#ff5000; color:#fff; text-decoration:none; border-radius:4px;" href="${escapeHtml(item.final_1688_link)}" target="_blank" rel="noopener">1688链接</a>` : ''}
+          </div>
+
+          <div class="footer-row" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:6px; margin-top:4px;">
+            <div class="mini-id" style="font-size:10px; color:#999;">ID: ${escapeHtml(item.modelId || '')}</div>
+            <div class="update-date" style="font-size:11px; color:#666; font-weight:bold;">${escapeHtml(item['update date'] || '')}</div>
           </div>
         </div>
       </article>
     `;
   }).join('');
 
+  // 绑定点击复制
   document.querySelectorAll('.invitation-box').forEach(el => {
     el.onclick = async () => {
       const val = el.getAttribute('data-copy');
