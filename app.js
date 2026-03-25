@@ -64,6 +64,9 @@ function renderCards() {
     const pVal = item['提品优先级'] || '-';
     const pClass = pVal.includes('高') ? 'p0' : 'p1';
 
+    // 获取规格字段（兼容多种可能的表头名称，请确保 CSV 中包含其中之一）
+    const specification = item['规格'] || item['商品规格'] || item['sku'] || '标准规格';
+
     return `
       <article class="card">
         <div class="card-checkbox">
@@ -77,7 +80,14 @@ function renderCards() {
         </div>
         <div class="card-bottom">
           <div class="title" title="${item.title}">${item.title}</div>
-          <div class="price">¥${parseFloat(item.price || 0).toFixed(2)}</div>
+          
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+            <div class="price">¥${parseFloat(item.price || 0).toFixed(2)}</div>
+            <div style="font-size: 12px; color: #666; background: #f4f4f4; padding: 2px 6px; border-radius: 4px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${specification}">
+              ${specification}
+            </div>
+          </div>
+
           <div class="invitation-row">
             <div class="invitation-box" onclick="copyVal('${item.inviteId}')">${item.inviteId || '无'}</div>
           </div>
@@ -92,6 +102,16 @@ function renderCards() {
         </div>
       </article>`;
   }).join('');
+
+  // 重新绑定事件监听
+  document.querySelectorAll('.select-item').forEach(cb => {
+    cb.onchange = (e) => {
+      const id = e.target.dataset.id;
+      e.target.checked ? state.selectedIds.add(id) : state.selectedIds.delete(id);
+      updateCountDisplay();
+    };
+  });
+}
 
   document.querySelectorAll('.select-item').forEach(cb => {
     cb.onchange = (e) => {
