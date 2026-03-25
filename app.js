@@ -1,5 +1,5 @@
 /**
- * 运动户外/灯具 专用逻辑脚本
+ * 运动户外版 - 稳定修复版 (保持原模板结构)
  */
 const state = { 
   allProducts: [], filteredProducts: [], selectedIds: new Set() 
@@ -64,8 +64,8 @@ function renderCards() {
     const pVal = item['提品优先级'] || '-';
     const pClass = pVal.includes('高') ? 'p0' : 'p1';
 
-    // 获取规格字段（兼容多种可能的表头名称，请确保 CSV 中包含其中之一）
-    const specification = item['规格'] || item['商品规格'] || item['sku'] || '标准规格';
+    // 仅仅在这里增加了规格读取逻辑，不影响其他字段
+    const spec = item['规格'] || item['商品规格'] || '通用';
 
     return `
       <article class="card">
@@ -83,9 +83,7 @@ function renderCards() {
           
           <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
             <div class="price">¥${parseFloat(item.price || 0).toFixed(2)}</div>
-            <div style="font-size: 12px; color: #666; background: #f4f4f4; padding: 2px 6px; border-radius: 4px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${specification}">
-              ${specification}
-            </div>
+            <div style="font-size: 12px; color: #8a9099; background: #f0f0f2; padding: 2px 6px; border-radius: 4px;">${spec}</div>
           </div>
 
           <div class="invitation-row">
@@ -102,16 +100,6 @@ function renderCards() {
         </div>
       </article>`;
   }).join('');
-
-  // 重新绑定事件监听
-  document.querySelectorAll('.select-item').forEach(cb => {
-    cb.onchange = (e) => {
-      const id = e.target.dataset.id;
-      e.target.checked ? state.selectedIds.add(id) : state.selectedIds.delete(id);
-      updateCountDisplay();
-    };
-  });
-}
 
   document.querySelectorAll('.select-item').forEach(cb => {
     cb.onchange = (e) => {
@@ -141,13 +129,13 @@ function bindEvents() {
 }
 
 function applyFilters() {
-  const kw = els.keyword.value.trim().toLowerCase();
-  const c1 = els.category1.value;
-  const c2 = els.category2.value;
-  const pr = els.priority.value;
-  const min = parseFloat(els.minPrice.value);
-  const max = parseFloat(els.maxPrice.value);
-  const sort = els.sortBy.value;
+  const kw = els.keyword?.value.trim().toLowerCase() || '';
+  const c1 = els.category1?.value || '';
+  const c2 = els.category2?.value || '';
+  const pr = els.priority?.value || '';
+  const min = parseFloat(els.minPrice?.value);
+  const max = parseFloat(els.maxPrice?.value);
+  const sort = els.sortBy?.value || 'default';
 
   state.filteredProducts = state.allProducts.filter(item => {
     const text = [item.title, item.inviteId, item.modelId].join(' ').toLowerCase();
@@ -163,22 +151,24 @@ function applyFilters() {
 
 function fillCategory1Options() {
   const values = [...new Set(state.allProducts.map(x => x.l1).filter(Boolean))].sort();
-  els.category1.innerHTML = '<option value="">二级类目(全部)</option>' + values.map(v => `<option value="${v}">${v}</option>`).join('');
+  if(els.category1) els.category1.innerHTML = '<option value="">二级类目(全部)</option>' + values.map(v => `<option value="${v}">${v}</option>`).join('');
   refillCategory2Options();
 }
 
 function refillCategory2Options() {
-  const selected = els.category1.value;
+  const selected = els.category1?.value;
   const source = selected ? state.allProducts.filter(x => x.l1 === selected) : state.allProducts;
   const values = [...new Set(source.map(x => x.l2).filter(Boolean))].sort();
-  els.category2.innerHTML = '<option value="">三级类目(全部)</option>' + values.map(v => `<option value="${v}">${v}</option>`).join('');
+  if(els.category2) els.category2.innerHTML = '<option value="">三级类目(全部)</option>' + values.map(v => `<option value="${v}">${v}</option>`).join('');
 }
 
 window.copyVal = (v) => {
   navigator.clipboard.writeText(v).then(() => {
-    els.toast.textContent = "已复制: " + v;
-    els.toast.classList.remove('hidden');
-    setTimeout(() => els.toast.classList.add('hidden'), 2000);
+    if(els.toast) {
+      els.toast.textContent = "已复制: " + v;
+      els.toast.classList.remove('hidden');
+      setTimeout(() => els.toast.classList.add('hidden'), 2000);
+    }
   });
 };
 
