@@ -95,8 +95,8 @@ function renderCards() {
             <div class="invitation-box" onclick="copyVal('${item.inviteId}')">${item.inviteId || '无'}</div>
           </div>
           <div class="links-row">
-            <a class="link-btn link-origin" href="${item.link}" target="_blank">原品</a>
-            <a class="link-btn link-1688" href="${item.final_1688_link}" target="_blank">1688</a>
+            <a class="link-btn link-origin" style="padding: 8px 4px; font-size: 12px;" href="${item.link}" target="_blank">原品链接</a>
+            <a class="link-btn link-1688" style="padding: 8px 4px; font-size: 12px;" href="${item.final_1688_link}" target="_blank">1688链接</a>
           </div>
           <div class="footer-row">
             <div>ID: ${item.modelId || '-'}</div>
