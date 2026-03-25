@@ -1,5 +1,6 @@
 /**
- * 运动户外版 - 稳定修复版 (保持原模板结构)
+ * 运动户外版 - 最终修复版
+ * 重点：对接 variant 列，统一 data.csv 路径
  */
 const state = { 
   allProducts: [], filteredProducts: [], selectedIds: new Set() 
@@ -23,8 +24,10 @@ const els = {
 
 async function init() {
   try {
-    const response = await fetch('./data.csv?v=' + Date.now());
-    if (!response.ok) throw new Error("无法读取 data.csv");
+    // 确保这里的路径与 GitHub 仓库根目录的文件名完全一致
+    const response = await fetch('./data.csv?v=' + Date.now()); 
+    if (!response.ok) throw new Error("无法读取 data.csv，请确认文件名大小写是否一致");
+    
     const csvText = await response.text();
     const result = Papa.parse(csvText, { header: true, skipEmptyLines: 'greedy' });
     state.allProducts = result.data.filter(item => item.title || item.inviteId);
@@ -34,7 +37,7 @@ async function init() {
     applyFilters();
   } catch (e) {
     console.error(e);
-    if(els.cardGrid) els.cardGrid.innerHTML = `<div class="empty">数据加载失败，请检查 data.csv</div>`;
+    if(els.cardGrid) els.cardGrid.innerHTML = `<div class="empty">加载失败: ${e.message}</div>`;
   }
 }
 
@@ -64,8 +67,8 @@ function renderCards() {
     const pVal = item['提品优先级'] || '-';
     const pClass = pVal.includes('高') ? 'p0' : 'p1';
 
-    // 仅仅在这里增加了规格读取逻辑，不影响其他字段
-    const spec = item['规格'] || item['商品规格'] || '通用';
+    // 【核心修复】读取 CSV 中对应的 variant 列
+    const spec = item['variant'] || '标准规格';
 
     return `
       <article class="card">
@@ -81,17 +84,19 @@ function renderCards() {
         <div class="card-bottom">
           <div class="title" title="${item.title}">${item.title}</div>
           
-          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; gap: 8px;">
             <div class="price">¥${parseFloat(item.price || 0).toFixed(2)}</div>
-            <div style="font-size: 12px; color: #8a9099; background: #f0f0f2; padding: 2px 6px; border-radius: 4px;">${spec}</div>
+            <div style="font-size: 11px; color: #8a9099; background: #f0f0f2; padding: 2px 8px; border-radius: 4px; max-width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${spec}">
+              ${spec}
+            </div>
           </div>
 
           <div class="invitation-row">
             <div class="invitation-box" onclick="copyVal('${item.inviteId}')">${item.inviteId || '无'}</div>
           </div>
           <div class="links-row">
-            <a class="link-btn link-origin" href="${item.link}" target="_blank">原品链接</a>
-            <a class="link-btn link-1688" href="${item.final_1688_link}" target="_blank">1688链接</a>
+            <a class="link-btn link-origin" href="${item.link}" target="_blank">原品</a>
+            <a class="link-btn link-1688" href="${item.final_1688_link}" target="_blank">1688</a>
           </div>
           <div class="footer-row">
             <div>ID: ${item.modelId || '-'}</div>
